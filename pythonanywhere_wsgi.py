@@ -13,8 +13,8 @@ from dotenv import load_dotenv
 
 # ─── Loyiha joylashuvi ────────────────────────────────────────
 # PythonAnywhere da loyiha odatda: /home/YOUR_USERNAME/mysite/
-PROJECT_DIR = '/home/YOUR_USERNAME/eduanalytics_backend'
-VENV_DIR    = '/home/YOUR_USERNAME/.virtualenvs/eduanalytics/lib/python3.11/site-packages'
+PROJECT_DIR = '/home/eduanalytics/eduanalytics_backend'
+VENV_DIR    = '/home/eduanalytics/.virtualenvs/eduanalytics/lib/python3.13/site-packages'
 
 # ─── Virtual environment ─────────────────────────────────────
 if VENV_DIR not in sys.path:
