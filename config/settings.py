@@ -172,11 +172,9 @@ REST_FRAMEWORK = {
 # ══════════════════════════════════════════════════════════════
 #  🌍 CORS SOZLAMALAR
 # ══════════════════════════════════════════════════════════════
-# ⚠️ CORS_ALLOW_ALL_ORIGINS hech qachon True qilmang!
-# Har doim .env dan olib, ruxsat berilgan domenlarni belgilang
-_CORS = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000')
-CORS_ALLOWED_ORIGINS = [o.strip() for o in _CORS.split(',') if o.strip()]
-CORS_ALLOW_ALL_ORIGINS = False  # HECH QACHON DEBUG ga qarab qilmang!
+CORS_ALLOW_ALL_ORIGINS = True
+# _CORS = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000')
+# CORS_ALLOWED_ORIGINS = [o.strip() for o in _CORS.split(',') if o.strip()]
 
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = ['DELETE', 'GET', 'OPTIONS', 'PATCH', 'POST', 'PUT']
@@ -342,7 +340,10 @@ if not DEBUG:
     SECURE_HSTS_SECONDS              = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS   = True
     SECURE_HSTS_PRELOAD              = True
-    SECURE_SSL_REDIRECT              = True
+    # ⚠️ PythonAnywhere HTTPS ni proxy orqali boshqaradi
+    # SECURE_SSL_REDIRECT = True qilsak infinite loop bo'ladi!
+    SECURE_SSL_REDIRECT              = False
+    SECURE_PROXY_SSL_HEADER          = ('HTTP_X_FORWARDED_PROTO', 'https')
     SESSION_COOKIE_SECURE            = True
     CSRF_COOKIE_SECURE               = True
     X_FRAME_OPTIONS                  = 'DENY'
