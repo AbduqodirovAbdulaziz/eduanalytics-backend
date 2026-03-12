@@ -223,9 +223,9 @@ JAZZMIN_SETTINGS = {
 
     # ── UI sozlamalari ────────────────────────────────────
     "topmenu_links": [
-        {"name": "🏠 Bosh sahifa", "url": "admin:index"},
-        {"name": "📖 API Docs",    "url": "/api/v1/swagger/", "new_window": True},
-        {"name": "🔄 ReDoc",       "url": "/api/v1/redoc/",   "new_window": True},
+        {"name": "🏠 Dashboard", "url": "admin:index"},
+        {"name": "📖 Swagger UI", "url": "/api/v1/swagger/", "new_window": True},
+        {"name": "🔄 ReDoc API", "url": "/api/v1/redoc/", "new_window": True},
     ],
     "usermenu_links": [
         {"name": "📊 Dashboard", "url": "admin:index"},
