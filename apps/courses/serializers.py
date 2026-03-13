@@ -6,11 +6,13 @@ class CourseSerializer(serializers.ModelSerializer):
     group_count   = serializers.ReadOnlyField()
     student_count = serializers.ReadOnlyField()
     average_score = serializers.ReadOnlyField()
+    teacher_id    = serializers.IntegerField(source='teacher.id', read_only=True)
 
     class Meta:
         model = Course
         fields = [
             'id', 'name', 'subject', 'description',
+            'teacher_id',
             'group_count', 'student_count', 'average_score',
             'created_at'
         ]

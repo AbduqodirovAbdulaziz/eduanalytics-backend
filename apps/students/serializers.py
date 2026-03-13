@@ -25,18 +25,27 @@ class StudentSerializer(serializers.ModelSerializer):
 
 
 class StudentListSerializer(serializers.ModelSerializer):
-    """Ro'yxat uchun yengil serializer"""
-    group_name = serializers.CharField(source='group.name', read_only=True)
-    avg_score  = serializers.SerializerMethodField()
+    """Ro'yxat uchun serializer — Flutter StudentModel bilan to'liq mos"""
+    group_name  = serializers.CharField(source='group.name', read_only=True)
+    course_id   = serializers.IntegerField(source='group.course.id', read_only=True)
+    course_name = serializers.CharField(source='group.course.name', read_only=True)
+    scores      = ScoreSerializer(source='score', read_only=True)
+    avg_score   = serializers.SerializerMethodField()
 
     class Meta:
         model = Student
-        fields = ['id', 'name', 'email', 'group', 'group_name', 'avg_score', 'enrolled_at']
+        fields = [
+            'id', 'name', 'email',
+            'group', 'group_name',
+            'course_id', 'course_name',
+            'scores', 'avg_score', 'enrolled_at'
+        ]
 
     def get_avg_score(self, obj):
         try:
             s = obj.score
-            avg = (s.attendance + s.homework + s.quiz + s.exam) / 4
+            avg = (s.attendance * 0.2 + s.homework * 0.2 +
+                   s.quiz * 0.3 + s.exam * 0.3)
             return round(avg, 1)
         except Score.DoesNotExist:
             return None
