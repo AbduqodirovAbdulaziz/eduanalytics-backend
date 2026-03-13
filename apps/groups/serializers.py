@@ -11,41 +11,56 @@ class GroupSerializer(serializers.ModelSerializer):
     at_risk_count = serializers.SerializerMethodField()
 
     class Meta:
-        model = Group
+        model  = Group
         fields = [
             'id', 'name',
             'course', 'course_id', 'course_name',
             'student_count', 'average_score', 'at_risk_count',
-            'description', 'created_at'
+            'description', 'created_at',
         ]
         read_only_fields = ['id', 'created_at']
 
-    def get_average_score(self, obj):
-        """Guruh o'rtacha balli (attendance*0.2 + homework*0.2 + quiz*0.3 + exam*0.3)"""
+    def get_average_score(self, obj) -> float:
+        """
+        Weighted formula asosida guruh o'rtacha balli.
+        DB aggregation — N+1 yo'q.
+        """
         from apps.students.models import Score
-        scores = Score.objects.filter(student__group=obj)
-        if not scores.exists():
+        agg = Score.objects.filter(student__group=obj).aggregate(
+            avg_att=Avg('attendance'),
+            avg_hw=Avg('homework'),
+            avg_quiz=Avg('quiz'),
+            avg_exam=Avg('exam'),
+        )
+        if agg['avg_att'] is None:
             return 0.0
-        total = 0.0
-        count = 0
-        for s in scores:
-            total += s.attendance * 0.2 + s.homework * 0.2 + s.quiz * 0.3 + s.exam * 0.3
-            count += 1
-        return round(total / count, 1) if count else 0.0
+        return round(
+            (agg['avg_att']  or 0) * 0.2 +
+            (agg['avg_hw']   or 0) * 0.2 +
+            (agg['avg_quiz'] or 0) * 0.3 +
+            (agg['avg_exam'] or 0) * 0.3,
+            1
+        )
 
-    def get_at_risk_count(self, obj):
-        """Xavf ostidagi o'quvchilar soni (overall < 40)"""
+    def get_at_risk_count(self, obj) -> int:
+        """
+        Xavf ostidagi o'quvchilar soni — oxirgi prognozda 'Low Performance' bo'lganlar.
+        Score.weighted < 40 bo'lsa xavf bor deb hisoblanadi.
+        DB aggregation orqali (N+1 yo'q).
+        """
         from apps.students.models import Score
-        scores = Score.objects.filter(student__group=obj)
+        scores = Score.objects.filter(student__group=obj).values_list(
+            'attendance', 'homework', 'quiz', 'exam'
+        )
         return sum(
-            1 for s in scores
-            if (s.attendance * 0.2 + s.homework * 0.2 + s.quiz * 0.3 + s.exam * 0.3) < 40
+            1 for att, hw, q, e in scores
+            if (att * 0.2 + hw * 0.2 + q * 0.3 + e * 0.3) < 40
         )
 
 
 class GroupCreateSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Group
+        model  = Group
         fields = ['name', 'course', 'description']
 
     def validate_course(self, course):

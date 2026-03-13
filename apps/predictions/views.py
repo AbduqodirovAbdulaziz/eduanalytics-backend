@@ -63,10 +63,13 @@ class PredictView(APIView):
                 {'error': {'code': 422, 'message': serializer.errors}},
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY
             )
-        data = serializer.validated_data
-        student = Student.objects.get(id=data['student_id'])
+        data = dict(serializer.validated_data)
+        student = Student.objects.get(id=data.pop('student_id'))
         result = get_prediction(data['attendance'], data['homework'], data['quiz'], data['exam'])
-        prediction = Prediction.objects.create(student=student, **data | result)
+        prediction, _ = Prediction.objects.update_or_create(
+            student=student,
+            defaults={**data, **result},
+        )
         return Response({
             'student_id': student.id, 'student_name': student.name,
             'level': result['level'], 'risk_percentage': result['risk_percentage'],
@@ -111,9 +114,15 @@ class BatchPredictView(APIView):
             try:
                 s = student.score
                 result = get_prediction(s.attendance, s.homework, s.quiz, s.exam)
-                pred = Prediction.objects.create(
-                    student=student, attendance=s.attendance,
-                    homework=s.homework, quiz=s.quiz, exam=s.exam, **result
+                pred, _ = Prediction.objects.update_or_create(
+                    student=student,
+                    defaults={
+                        'attendance': s.attendance,
+                        'homework': s.homework,
+                        'quiz': s.quiz,
+                        'exam': s.exam,
+                        **result,
+                    }
                 )
                 results.append({
                     'student_id': student.id, 'student_name': student.name,

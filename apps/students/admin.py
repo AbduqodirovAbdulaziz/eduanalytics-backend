@@ -1,14 +1,49 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Student, Score
+from .models import Student, Score, DailyAttendance, HomeworkSubmission, QuizResult
 
+
+# ═══════════════════════════════════════════════════════════════
+#  INLINE SINFLARI
+# ═══════════════════════════════════════════════════════════════
 
 class ScoreInline(admin.TabularInline):
     model               = Score
     extra               = 0
-    fields              = ['attendance', 'homework', 'quiz', 'exam']
-    verbose_name        = "Natija"
-    verbose_name_plural = "Natijalar"
+    fields              = ['attendance', 'homework', 'quiz', 'exam', 'updated_at']
+    readonly_fields     = ['updated_at']
+    verbose_name        = "Umumiy natija (avtomatik)"
+    verbose_name_plural = "Umumiy natija (avtomatik agregatsiya)"
+
+
+class AttendanceInline(admin.TabularInline):
+    model               = DailyAttendance
+    extra               = 0
+    fields              = ['date', 'lesson_number', 'is_present', 'is_excused', 'note']
+    ordering            = ['-date']
+    max_num             = 50
+    verbose_name        = "Davomat"
+    verbose_name_plural = "Davomat tarixi"
+
+
+class HomeworkInline(admin.TabularInline):
+    model               = HomeworkSubmission
+    extra               = 0
+    fields              = ['date', 'title', 'score', 'max_score', 'submitted', 'note']
+    ordering            = ['-date']
+    max_num             = 50
+    verbose_name        = "Uy vazifasi"
+    verbose_name_plural = "Uy vazifalari tarixi"
+
+
+class QuizInline(admin.TabularInline):
+    model               = QuizResult
+    extra               = 0
+    fields              = ['date', 'quiz_type', 'topic', 'score', 'max_score', 'note']
+    ordering            = ['-date']
+    max_num             = 50
+    verbose_name        = "Quiz / Imtihon"
+    verbose_name_plural = "Quiz / Imtihon natijalari"
 
 
 class PredictionInline(admin.StackedInline):
@@ -23,11 +58,11 @@ class PredictionInline(admin.StackedInline):
 
     readonly_fields = [
         'level_badge', 'predicted_score_bar', 'risk_badge',
-        'full_recommendation', 'predicted_at'
+        'full_recommendation', 'predicted_at',
     ]
     fields = [
         'level_badge', 'predicted_score_bar', 'risk_badge',
-        'full_recommendation', 'predicted_at'
+        'full_recommendation', 'predicted_at',
     ]
 
     def get_queryset(self, request):
@@ -56,11 +91,10 @@ class PredictionInline(admin.StackedInline):
 
     @admin.display(description='Umumiy ball')
     def predicted_score_bar(self, obj):
-        score     = obj.predicted_score
-        color     = '#28a745' if score >= 70 else ('#ffc107' if score >= 40 else '#dc3545')
-        width     = int(min(score, 100))
-        # ✅ float ni oldindan str ga aylantiramiz
-        score_str = f'{score:.1f}'
+        score      = obj.predicted_score
+        color      = '#28a745' if score >= 70 else ('#ffc107' if score >= 40 else '#dc3545')
+        width      = int(min(score, 100))
+        score_str  = f'{score:.1f}'          # ✅ oldindan str ga o'girish
         return format_html(
             '<div style="min-width:160px">'
             '<div style="background:#e9ecef;border-radius:6px;height:10px;margin-bottom:4px">'
@@ -76,21 +110,19 @@ class PredictionInline(admin.StackedInline):
         risk      = obj.risk_percentage
         color     = '#dc3545' if risk >= 70 else ('#fd7e14' if risk >= 40 else '#28a745')
         label     = 'Yuqori xavf' if risk >= 70 else ("O'rta xavf" if risk >= 40 else 'Xavf past')
-        # ✅ float ni oldindan str ga aylantiramiz
-        risk_str  = f'{risk:.1f}'
+        risk_str  = f'{risk:.1f}'            # ✅ oldindan str ga o'girish
         return format_html(
-            '<span style="color:{};font-weight:700;font-size:13px">'
-            '{}% — {}</span>',
+            '<span style="color:{};font-weight:700;font-size:13px">{}% — {}</span>',
             color, risk_str, label
         )
 
-    @admin.display(description='💡 Tavsiya (Recommendation)')
+    @admin.display(description='💡 Tavsiya')
     def full_recommendation(self, obj):
         if not obj.recommendation:
             return '—'
-        lines  = obj.recommendation.strip().split('\n')
-        parts  = []
-        first  = True
+        lines = obj.recommendation.strip().split('\n')
+        parts = []
+        first = True
         for line in lines:
             line = line.strip()
             if not line:
@@ -102,7 +134,8 @@ class PredictionInline(admin.StackedInline):
                     f'margin-bottom:8px;color:#333">{line}</div>'
                 )
                 first = False
-            elif line.startswith(('🔴', '🟡', '🎯', '⚡', '🔍', '📋', '📊', '🏆', '🏅', '✅', '🚨')):
+            elif line.startswith(('🔴', '🟡', '🎯', '⚡', '🔍', '📋',
+                                   '📊', '🏆', '🏅', '✅', '🚨', '📈', '📉')):
                 parts.append(
                     f'<div style="font-size:13px;font-weight:600;'
                     f'margin-top:10px;margin-bottom:4px;color:#444">{line}</div>'
@@ -119,14 +152,19 @@ class PredictionInline(admin.StackedInline):
                     f'padding:5px 10px;margin:3px 0;border-radius:0 4px 4px 0;'
                     f'font-size:12px;color:#0c5460">{line}</div>'
                 )
+            elif line.startswith('🚨'):
+                parts.append(
+                    f'<div style="background:#f8d7da;border-left:4px solid #dc3545;'
+                    f'padding:5px 10px;margin:3px 0;border-radius:0 4px 4px 0;'
+                    f'font-size:12px;color:#721c24">{line}</div>'
+                )
             else:
                 parts.append(
                     f'<div style="padding:3px 4px;font-size:12px;color:#555">{line}</div>'
                 )
         return format_html(
             '<div style="background:#f8f9fa;border:1px solid #dee2e6;'
-            'border-radius:8px;padding:14px 18px;line-height:1.7">'
-            '{}</div>',
+            'border-radius:8px;padding:14px 18px;line-height:1.7">{}</div>',
             format_html(''.join(parts))
         )
 
@@ -137,15 +175,19 @@ class PredictionInline(admin.StackedInline):
         return False
 
 
+# ═══════════════════════════════════════════════════════════════
+#  STUDENT ADMIN
+# ═══════════════════════════════════════════════════════════════
+
 @admin.register(Student)
 class StudentAdmin(admin.ModelAdmin):
     list_display  = [
         'name', 'group_link', 'score_summary',
-        'prediction_badge', 'enrolled_at'
+        'daily_stats', 'prediction_badge', 'enrolled_at',
     ]
     list_filter   = ['group__course']
     search_fields = ['name', 'email']
-    inlines       = [ScoreInline, PredictionInline]
+    inlines       = [ScoreInline, AttendanceInline, HomeworkInline, QuizInline, PredictionInline]
     list_per_page = 25
 
     fieldsets = (
@@ -166,22 +208,42 @@ class StudentAdmin(admin.ModelAdmin):
             obj.group.course.name, obj.group.name
         )
 
-    @admin.display(description='Natijalar')
+    @admin.display(description='Umumiy natijalar')
     def score_summary(self, obj):
         try:
-            s   = obj.score
-            avg = round((s.attendance + s.homework + s.quiz + s.exam) / 4, 1)
+            s     = obj.score
+            avg   = round(
+                s.attendance * 0.2 + s.homework * 0.2 +
+                s.quiz * 0.3 + s.exam * 0.3, 1
+            )
             color = '#28a745' if avg >= 70 else ('#ffc107' if avg >= 40 else '#dc3545')
             # ✅ barcha float larni oldindan str ga aylantiramiz
+            att_s = str(s.attendance)
+            hw_s  = str(s.homework)
+            q_s   = str(s.quiz)
+            e_s   = str(s.exam)
+            avg_s = str(avg)
             return format_html(
                 '<span style="font-size:11px;color:#777">'
-                'D:{} H:{} Q:{} I:{}</span><br>'
+                'D:{} H:{} Q:{} I:{}'
+                '</span><br>'
                 '<b style="color:{}">&oslash; {}</b>',
-                s.attendance, s.homework, s.quiz, s.exam,
-                color, avg
+                att_s, hw_s, q_s, e_s, color, avg_s
             )
         except Exception:
             return format_html('<span style="color:#999">—</span>')
+
+    @admin.display(description='Kunlik yozuvlar')
+    def daily_stats(self, obj):
+        att_count  = obj.attendances.count()
+        hw_count   = obj.homeworks.count()
+        quiz_count = obj.quiz_results.count()
+        return format_html(
+            '<span style="font-size:11px;color:#555">'
+            '📅 {}<br>📝 {}<br>📊 {}'
+            '</span>',
+            att_count, hw_count, quiz_count
+        )
 
     @admin.display(description='Prognoz')
     def prediction_badge(self, obj):
@@ -202,12 +264,12 @@ class StudentAdmin(admin.ModelAdmin):
         }
         bg, color, icon = colors.get(pred.level, ('#eee', '#333', '⚪'))
         label     = labels.get(pred.level, pred.level)
-        # ✅ float ni oldindan str ga aylantiramiz
-        score_str = f'{pred.predicted_score:.1f}'
+        score_str = f'{pred.predicted_score:.1f}'   # ✅ oldindan str ga o'girish
         return format_html(
             '<span style="background:{};color:{};padding:2px 8px;'
             'border-radius:10px;font-size:11px;font-weight:600">'
-            '{} {}</span><br>'
+            '{} {}'
+            '</span><br>'
             '<span style="font-size:11px;color:#777">{} ball</span>',
             bg, color, icon, label, score_str
         )
@@ -219,14 +281,123 @@ class StudentAdmin(admin.ModelAdmin):
         return qs
 
     def get_list_filter(self, request):
-        if not request.user.is_superuser:
-            return ['group']
-        return self.list_filter
-
-    def has_add_permission(self, request):
-        return request.user.is_staff or request.user.is_superuser
+        return ['group'] if not request.user.is_superuser else self.list_filter
 
     def has_delete_permission(self, request, obj=None):
         if not request.user.is_superuser and obj:
             return obj.group.course.teacher == request.user
         return request.user.is_superuser or request.user.is_staff
+
+
+# ═══════════════════════════════════════════════════════════════
+#  DAVOMAT ADMIN
+# ═══════════════════════════════════════════════════════════════
+
+@admin.register(DailyAttendance)
+class DailyAttendanceAdmin(admin.ModelAdmin):
+    list_display   = ['student', 'date', 'lesson_number', 'status_badge', 'note']
+    list_filter    = ['is_present', 'is_excused', 'date']
+    search_fields  = ['student__name']
+    ordering       = ['-date', 'student__name']
+    date_hierarchy = 'date'
+
+    @admin.display(description='Holat')
+    def status_badge(self, obj):
+        if obj.is_present:
+            return format_html('<span style="color:#28a745;font-weight:600">✅ Keldi</span>')
+        elif obj.is_excused:
+            return format_html('<span style="color:#ffc107;font-weight:600">📋 Sababli</span>')
+        else:
+            return format_html('<span style="color:#dc3545;font-weight:600">❌ Kelmadi</span>')
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if not request.user.is_superuser:
+            qs = qs.filter(student__group__course__teacher=request.user)
+        return qs
+
+
+# ═══════════════════════════════════════════════════════════════
+#  UY VAZIFASI ADMIN
+# ═══════════════════════════════════════════════════════════════
+
+@admin.register(HomeworkSubmission)
+class HomeworkAdmin(admin.ModelAdmin):
+    list_display   = ['student', 'date', 'title', 'score_display', 'submitted']
+    list_filter    = ['submitted', 'date']
+    search_fields  = ['student__name', 'title']
+    ordering       = ['-date']
+    date_hierarchy = 'date'
+
+    @admin.display(description='Ball')
+    def score_display(self, obj):
+        pct       = obj.percentage
+        color     = '#28a745' if pct >= 70 else ('#ffc107' if pct >= 40 else '#dc3545')
+        # ✅ oldindan str ga o'girish
+        score_s   = str(obj.score)
+        max_s     = str(obj.max_score)
+        pct_s     = str(pct)
+        return format_html(
+            '<b style="color:{}">{}/{}</b>'
+            ' <span style="color:#999;font-size:11px">({}%)</span>',
+            color, score_s, max_s, pct_s
+        )
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if not request.user.is_superuser:
+            qs = qs.filter(student__group__course__teacher=request.user)
+        return qs
+
+
+# ═══════════════════════════════════════════════════════════════
+#  QUIZ ADMIN
+# ═══════════════════════════════════════════════════════════════
+
+@admin.register(QuizResult)
+class QuizResultAdmin(admin.ModelAdmin):
+    list_display   = ['student', 'date', 'quiz_type_badge', 'topic', 'score_display']
+    list_filter    = ['quiz_type', 'date']
+    search_fields  = ['student__name', 'topic']
+    ordering       = ['-date']
+    date_hierarchy = 'date'
+
+    @admin.display(description='Tur')
+    def quiz_type_badge(self, obj):
+        colors = {
+            'quiz':      ('#e8f4fd', '#0c5460'),
+            'classwork': ('#fff3cd', '#856404'),
+            'exam':      ('#f8d7da', '#721c24'),
+        }
+        labels = {
+            'quiz':      'Quiz',
+            'classwork': 'Sinf ishi',
+            'exam':      'Imtihon',
+        }
+        bg, color = colors.get(obj.quiz_type, ('#eee', '#333'))
+        label     = labels.get(obj.quiz_type, obj.quiz_type)
+        return format_html(
+            '<span style="background:{};color:{};padding:2px 8px;'
+            'border-radius:8px;font-size:11px;font-weight:600">{}</span>',
+            bg, color, label
+        )
+
+    @admin.display(description='Ball')
+    def score_display(self, obj):
+        pct   = obj.percentage
+        color = '#28a745' if pct >= 70 else ('#ffc107' if pct >= 40 else '#dc3545')
+        # ✅ oldindan str ga o'girish
+        score_s = str(obj.score)
+        max_s   = str(obj.max_score)
+        pct_s   = str(pct)
+        return format_html(
+            '<b style="color:{}">{}/{}</b>'
+            ' <span style="color:#999;font-size:11px">({}%)</span>',
+            color, score_s, max_s, pct_s
+        )
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if not request.user.is_superuser:
+            qs = qs.filter(student__group__course__teacher=request.user)
+        return qs

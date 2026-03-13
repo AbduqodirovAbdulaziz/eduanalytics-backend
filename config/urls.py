@@ -37,12 +37,21 @@ Bu API Flutter frontend ilovasi bilan ishlash uchun mo'ljallangan.
 | Kurslar | `/api/v1/courses/` |
 | Guruhlar | `/api/v1/groups/` |
 | O'quvchilar | `/api/v1/students/` |
+| Davomat (bulk) | `/api/v1/attendance/bulk/` |
+| Uy vazifasi (bulk) | `/api/v1/homework/bulk/` |
+| Quiz / Imtihon (bulk) | `/api/v1/quiz/bulk/` |
 | ML Prognoz | `/api/v1/predict/` |
 | Statistika | `/api/v1/stats/` |
 
+### 📅 Kunlik kiritish
+- **Davomat**: `POST /api/v1/students/<id>/attendance/` yoki bulk `/api/v1/attendance/bulk/`
+- **Uy vazifasi**: `POST /api/v1/students/<id>/homework/` yoki bulk `/api/v1/homework/bulk/`
+- **Quiz/Imtihon**: `POST /api/v1/students/<id>/quiz/` yoki bulk `/api/v1/quiz/bulk/`
+- **Progress grafik**: `GET /api/v1/students/<id>/progress/`
+
 ### 🤖 ML Prognoz Darajalari
 - **High Performance** (≥70): Yuqori ko'rsatkich
-- **Medium Performance** (40–69): O'rta daraja  
+- **Medium Performance** (40–69): O'rta daraja
 - **Low Performance** (<40): Darhol yordam kerak
         """,
         terms_of_service="https://www.example.com/terms/",
@@ -71,6 +80,11 @@ urlpatterns = [
         path('courses/', include('apps.courses.urls')),
         path('groups/',  include('apps.groups.urls')),
         path('students/', include('apps.students.urls')),
+
+        # ── Kunlik kiritish (Bulk endpoints) ──────────────
+        path('attendance/', include('apps.students.attendance_urls')),
+        path('homework/',   include('apps.students.homework_urls')),
+        path('quiz/',       include('apps.students.quiz_urls')),
 
         # ML
         path('predict/', include('apps.predictions.urls')),
