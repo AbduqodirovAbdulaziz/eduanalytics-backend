@@ -11,9 +11,17 @@ from .serializers import CourseSerializer, CourseCreateSerializer
 class CourseListCreateView(generics.ListCreateAPIView):
     """Kurslar ro'yxati va yaratish"""
     permission_classes = [IsAuthenticated]
+    queryset = Course.objects.all()
 
     def get_queryset(self):
-        return Course.objects.filter(teacher=self.request.user)
+        if getattr(self, 'swagger_fake_view', False):
+            return Course.objects.none()
+
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return Course.objects.none()
+
+        return Course.objects.filter(teacher=user)
 
     def get_serializer_class(self):
         return CourseCreateSerializer if self.request.method == 'POST' else CourseSerializer
@@ -46,13 +54,26 @@ class CourseListCreateView(generics.ListCreateAPIView):
 class CourseDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Kurs tafsiloti, yangilash, o'chirish"""
     permission_classes = [IsAuthenticated]
-    serializer_class = CourseSerializer
+    queryset = Course.objects.all()
 
     def get_queryset(self):
-        return Course.objects.filter(teacher=self.request.user)
+        if getattr(self, 'swagger_fake_view', False):
+            return Course.objects.none()
 
-    @swagger_auto_schema(operation_id='courses_get',    operation_summary='Kurs tafsiloti',  tags=['📚 Kurslar'])
-    def retrieve(self, request, *args, **kwargs): return super().retrieve(request, *args, **kwargs)
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return Course.objects.none()
+
+        return Course.objects.filter(teacher=user)
+
+    def get_serializer_class(self):
+        if self.request.method in ['PUT', 'PATCH']:
+            return CourseCreateSerializer
+        return CourseSerializer
+
+    @swagger_auto_schema(operation_id='courses_get', operation_summary='Kurs tafsiloti', tags=['📚 Kurslar'])
+    def retrieve(self, request, *args, **kwargs):
+        return super().retrieve(request, *args, **kwargs)
 
     @swagger_auto_schema(operation_id='courses_update', operation_summary='Kursni yangilash', tags=['📚 Kurslar'])
     def update(self, request, *args, **kwargs):
@@ -62,5 +83,6 @@ class CourseDetailView(generics.RetrieveUpdateDestroyAPIView):
             return Response(CourseSerializer(s.save()).data)
         return Response({'error': s.errors}, status=status.HTTP_400_BAD_REQUEST)
 
-    @swagger_auto_schema(operation_id='courses_delete', operation_summary='Kursni o\'chirish', tags=['📚 Kurslar'])
-    def destroy(self, request, *args, **kwargs): return super().destroy(request, *args, **kwargs)
+    @swagger_auto_schema(operation_id='courses_delete', operation_summary="Kursni o'chirish", tags=['📚 Kurslar'])
+    def destroy(self, request, *args, **kwargs):
+        return super().destroy(request, *args, **kwargs)

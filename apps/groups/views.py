@@ -9,13 +9,24 @@ from .serializers import GroupSerializer, GroupCreateSerializer
 class GroupListCreateView(generics.ListCreateAPIView):
     """GET/POST /api/v1/groups"""
     permission_classes = [IsAuthenticated]
+    queryset = Group.objects.all()   # schema generation uchun kerak
 
     def get_queryset(self):
-        qs = Group.objects.filter(course__teacher=self.request.user)
+        if getattr(self, 'swagger_fake_view', False):
+            return Group.objects.none()
+
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return Group.objects.none()
+
+        qs = Group.objects.filter(course__teacher=user)
         course_id = self.request.query_params.get('course_id')
         if course_id:
             qs = qs.filter(course_id=course_id)
         return qs
+
+    def get_serializer_class(self):
+        return GroupCreateSerializer if self.request.method == 'POST' else GroupSerializer
 
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
@@ -33,7 +44,19 @@ class GroupListCreateView(generics.ListCreateAPIView):
 class GroupDetailView(generics.RetrieveUpdateDestroyAPIView):
     """GET/PUT/DELETE /api/v1/groups/:id"""
     permission_classes = [IsAuthenticated]
-    serializer_class = GroupSerializer
+    queryset = Group.objects.all()
 
     def get_queryset(self):
-        return Group.objects.filter(course__teacher=self.request.user)
+        if getattr(self, 'swagger_fake_view', False):
+            return Group.objects.none()
+
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return Group.objects.none()
+
+        return Group.objects.filter(course__teacher=user)
+
+    def get_serializer_class(self):
+        if self.request.method in ['PUT', 'PATCH']:
+            return GroupCreateSerializer
+        return GroupSerializer

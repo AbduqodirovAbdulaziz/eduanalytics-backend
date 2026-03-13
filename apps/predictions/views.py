@@ -4,12 +4,14 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
+import logging
 
 from apps.students.models import Student
 from .models import Prediction
 from .serializers import PredictRequestSerializer, BatchPredictRequestSerializer, PredictionSerializer
 from ml.ml_service import get_prediction
 
+logger = logging.getLogger(__name__)
 
 predict_request_schema = openapi.Schema(
     type=openapi.TYPE_OBJECT,
@@ -64,19 +66,51 @@ class PredictView(APIView):
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY
             )
         data = dict(serializer.validated_data)
-        student = Student.objects.get(id=data.pop('student_id'))
-        result = get_prediction(data['attendance'], data['homework'], data['quiz'], data['exam'])
-        prediction, _ = Prediction.objects.update_or_create(
-            student=student,
-            defaults={**data, **result},
-        )
-        return Response({
-            'student_id': student.id, 'student_name': student.name,
-            'level': result['level'], 'risk_percentage': result['risk_percentage'],
-            'predicted_score': result['predicted_score'],
-            'recommendation': result['recommendation'],
-            'predicted_at': prediction.predicted_at,
-        })
+        try:
+            student = Student.objects.select_related('group', 'group__course').get(
+                id=data.pop('student_id')
+            )
+            # Barcha qiymatlarni float ga convert qilish
+            att  = float(data.get('attendance', 0) or 0)
+            hw   = float(data.get('homework',   0) or 0)
+            quiz = float(data.get('quiz',       0) or 0)
+            exam = float(data.get('exam',       0) or 0)
+
+            result = get_prediction(att, hw, quiz, exam)
+
+            prediction, _ = Prediction.objects.update_or_create(
+                student=student,
+                defaults={
+                    'attendance':      att,
+                    'homework':        hw,
+                    'quiz':            quiz,
+                    'exam':            exam,
+                    'predicted_score': result['predicted_score'],
+                    'level':           result['level'],
+                    'risk_percentage': result['risk_percentage'],
+                    'recommendation':  result['recommendation'],
+                },
+            )
+            return Response({
+                'student_id':      student.id,
+                'student_name':    student.name,
+                'level':           result['level'],
+                'risk_percentage': result['risk_percentage'],
+                'predicted_score': result['predicted_score'],
+                'recommendation':  result['recommendation'],
+                'predicted_at':    prediction.predicted_at,
+            })
+        except Student.DoesNotExist:
+            return Response(
+                {'error': {'code': 404, 'message': "O'quvchi topilmadi"}},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"PredictView error: {e}", exc_info=True)
+            return Response(
+                {'error': {'code': 500, 'message': f"Prognoz xatosi: {str(e)}"}},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class BatchPredictView(APIView):
@@ -112,24 +146,36 @@ class BatchPredictView(APIView):
         results = []
         for student in students:
             try:
-                s = student.score
-                result = get_prediction(s.attendance, s.homework, s.quiz, s.exam)
+                try:
+                    s = student.score
+                    att  = float(s.attendance or 0)
+                    hw   = float(s.homework   or 0)
+                    quiz = float(s.quiz       or 0)
+                    exam = float(s.exam       or 0)
+                except Exception:
+                    att = hw = quiz = exam = 0.0
+
+                result = get_prediction(att, hw, quiz, exam)
                 pred, _ = Prediction.objects.update_or_create(
                     student=student,
                     defaults={
-                        'attendance': s.attendance,
-                        'homework': s.homework,
-                        'quiz': s.quiz,
-                        'exam': s.exam,
-                        **result,
+                        'attendance': att, 'homework': hw,
+                        'quiz': quiz, 'exam': exam, **result,
                     }
                 )
                 results.append({
-                    'student_id': student.id, 'student_name': student.name,
-                    **result, 'predicted_at': pred.predicted_at,
+                    'student_id':   student.id,
+                    'student_name': student.name,
+                    **result,
+                    'predicted_at': pred.predicted_at,
                 })
             except Exception as e:
-                results.append({'student_id': student.id, 'student_name': student.name, 'error': str(e)})
+                logger.error(f"Batch predict error for student {student.id}: {e}")
+                results.append({
+                    'student_id':   student.id,
+                    'student_name': student.name,
+                    'error':        str(e),
+                })
         return Response({'data': results, 'total': len(results)})
 
 

@@ -1,10 +1,25 @@
 """
 EduAnalytics — Students App Serializers
 Barcha serialiaztor sinflari: Student, Score, DailyAttendance, HomeworkSubmission, QuizResult
+
+✅ FIX: timezone.localdate() ishlatiladi (UTC emas, Asia/Tashkent)
 """
 from rest_framework import serializers
 from django.utils import timezone
 from .models import Student, Score, DailyAttendance, HomeworkSubmission, QuizResult
+
+
+# ═══════════════════════════════════════════════════════════════
+#  YORDAMCHI: Bugungi local sana (Asia/Tashkent)
+# ═══════════════════════════════════════════════════════════════
+
+def _today_local():
+    """
+    Server timezone (Asia/Tashkent) bo'yicha bugungi sanani qaytaradi.
+    timezone.now().date()  → UTC sana (xato: Toshkent gechasida kelajak sana deydi)
+    timezone.localdate()   → Django TIME_ZONE sozlamasiga muvofiq sana (to'g'ri)
+    """
+    return timezone.localdate()
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -92,11 +107,6 @@ class StudentListSerializer(serializers.ModelSerializer):
 
 
 class StudentCreateSerializer(serializers.ModelSerializer):
-    """
-    O'quvchi yaratish / yangilash.
-    attendance/homework/quiz/exam — boshlang'ich qiymatlar uchun (ixtiyoriy).
-    Kunlik yozuvlar keyin qo'shilganda Score avtomatik yangilanadi.
-    """
     attendance = serializers.FloatField(default=0.0, min_value=0, max_value=100, write_only=True)
     homework   = serializers.FloatField(default=0.0, min_value=0, max_value=100, write_only=True)
     quiz       = serializers.FloatField(default=0.0, min_value=0, max_value=100, write_only=True)
@@ -120,7 +130,6 @@ class StudentCreateSerializer(serializers.ModelSerializer):
             'exam':       validated_data.pop('exam',       0.0),
         }
         student = Student.objects.create(**validated_data)
-        # Signal allaqachon default(0,0,0,0) Score yaratdi — faqat update:
         Score.objects.filter(student=student).update(**scores_data)
         return student
 
@@ -148,7 +157,6 @@ class StudentCreateSerializer(serializers.ModelSerializer):
 # ═══════════════════════════════════════════════════════════════
 
 class DailyAttendanceSerializer(serializers.ModelSerializer):
-    """O'qish uchun"""
     student_name = serializers.CharField(source='student.name', read_only=True)
 
     class Meta:
@@ -161,19 +169,18 @@ class DailyAttendanceSerializer(serializers.ModelSerializer):
 
 
 class DailyAttendanceCreateSerializer(TeacherOwnsMixin, serializers.ModelSerializer):
-    """Bitta davomat yozuvi yaratish"""
     class Meta:
         model  = DailyAttendance
         fields = ['student', 'date', 'lesson_number', 'is_present', 'is_excused', 'note']
 
     def validate_date(self, value):
-        if value > timezone.now().date():
+        # ✅ FIX: localdate() — Asia/Tashkent timezone bo'yicha
+        if value > _today_local():
             raise serializers.ValidationError("Kelajak sanasi kiritib bo'lmaydi!")
         return value
 
 
 class BulkAttendanceItemSerializer(serializers.Serializer):
-    """Guruh davomat kiritishda har bir o'quvchi uchun"""
     student_id = serializers.IntegerField()
     is_present = serializers.BooleanField(default=True)
     is_excused = serializers.BooleanField(default=False)
@@ -181,17 +188,14 @@ class BulkAttendanceItemSerializer(serializers.Serializer):
 
 
 class BulkAttendanceSerializer(serializers.Serializer):
-    """
-    Bir guruh uchun bir kunda bir vaqtda davomat kiritish.
-    POST /api/v1/attendance/bulk/
-    """
     group_id      = serializers.IntegerField()
     date          = serializers.DateField()
     lesson_number = serializers.IntegerField(default=1, min_value=1, max_value=20)
     attendances   = BulkAttendanceItemSerializer(many=True, min_length=1)
 
     def validate_date(self, value):
-        if value > timezone.now().date():
+        # ✅ FIX: localdate() — Asia/Tashkent timezone bo'yicha
+        if value > _today_local():
             raise serializers.ValidationError("Kelajak sanasi kiritib bo'lmaydi!")
         return value
 
@@ -220,7 +224,6 @@ class BulkAttendanceSerializer(serializers.Serializer):
 # ═══════════════════════════════════════════════════════════════
 
 class HomeworkSubmissionSerializer(serializers.ModelSerializer):
-    """O'qish uchun"""
     student_name = serializers.CharField(source='student.name', read_only=True)
     percentage   = serializers.ReadOnlyField()
 
@@ -234,7 +237,6 @@ class HomeworkSubmissionSerializer(serializers.ModelSerializer):
 
 
 class HomeworkSubmissionCreateSerializer(TeacherOwnsMixin, serializers.ModelSerializer):
-    """Uy vazifasi kiritish"""
     class Meta:
         model  = HomeworkSubmission
         fields = ['student', 'date', 'title', 'max_score', 'score', 'submitted', 'note']
@@ -247,16 +249,13 @@ class HomeworkSubmissionCreateSerializer(TeacherOwnsMixin, serializers.ModelSeri
         return data
 
     def validate_date(self, value):
-        if value > timezone.now().date():
+        # ✅ FIX: localdate()
+        if value > _today_local():
             raise serializers.ValidationError("Kelajak sanasi kiritib bo'lmaydi!")
         return value
 
 
 class BulkHomeworkSerializer(serializers.Serializer):
-    """
-    Bir guruh uchun bir uy vazifasini bir vaqtda kiritish.
-    POST /api/v1/homework/bulk/
-    """
     class HomeworkItemSerializer(serializers.Serializer):
         student_id = serializers.IntegerField()
         score      = serializers.FloatField(min_value=0)
@@ -270,7 +269,8 @@ class BulkHomeworkSerializer(serializers.Serializer):
     students  = HomeworkItemSerializer(many=True, min_length=1)
 
     def validate_date(self, value):
-        if value > timezone.now().date():
+        # ✅ FIX: localdate()
+        if value > _today_local():
             raise serializers.ValidationError("Kelajak sanasi kiritib bo'lmaydi!")
         return value
 
@@ -290,7 +290,6 @@ class BulkHomeworkSerializer(serializers.Serializer):
 # ═══════════════════════════════════════════════════════════════
 
 class QuizResultSerializer(serializers.ModelSerializer):
-    """O'qish uchun"""
     student_name      = serializers.CharField(source='student.name', read_only=True)
     percentage        = serializers.ReadOnlyField()
     quiz_type_display = serializers.CharField(source='get_quiz_type_display', read_only=True)
@@ -306,7 +305,6 @@ class QuizResultSerializer(serializers.ModelSerializer):
 
 
 class QuizResultCreateSerializer(TeacherOwnsMixin, serializers.ModelSerializer):
-    """Quiz / imtihon natijasi kiritish"""
     class Meta:
         model  = QuizResult
         fields = ['student', 'date', 'quiz_type', 'topic', 'max_score', 'score', 'note']
@@ -319,16 +317,13 @@ class QuizResultCreateSerializer(TeacherOwnsMixin, serializers.ModelSerializer):
         return data
 
     def validate_date(self, value):
-        if value > timezone.now().date():
+        # ✅ FIX: localdate()
+        if value > _today_local():
             raise serializers.ValidationError("Kelajak sanasi kiritib bo'lmaydi!")
         return value
 
 
 class BulkQuizSerializer(serializers.Serializer):
-    """
-    Bir guruh uchun bir quiz/imtihonni bir vaqtda kiritish.
-    POST /api/v1/quiz/bulk/
-    """
     class QuizItemSerializer(serializers.Serializer):
         student_id = serializers.IntegerField()
         score      = serializers.FloatField(min_value=0)
@@ -342,7 +337,8 @@ class BulkQuizSerializer(serializers.Serializer):
     students  = QuizItemSerializer(many=True, min_length=1)
 
     def validate_date(self, value):
-        if value > timezone.now().date():
+        # ✅ FIX: localdate()
+        if value > _today_local():
             raise serializers.ValidationError("Kelajak sanasi kiritib bo'lmaydi!")
         return value
 
@@ -362,13 +358,9 @@ class BulkQuizSerializer(serializers.Serializer):
 # ═══════════════════════════════════════════════════════════════
 
 class StudentProgressSerializer(serializers.Serializer):
-    """
-    O'quvchi progress ma'lumotlari (frontend uchun grafik data).
-    GET /api/v1/students/<id>/progress/
-    """
-    student_id   = serializers.IntegerField()
-    student_name = serializers.CharField()
-    current_score = serializers.DictField()
+    student_id         = serializers.IntegerField()
+    student_name       = serializers.CharField()
+    current_score      = serializers.DictField()
     attendance_history = serializers.ListField()
     homework_history   = serializers.ListField()
     quiz_history       = serializers.ListField()

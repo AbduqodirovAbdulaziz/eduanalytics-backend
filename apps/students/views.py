@@ -36,18 +36,22 @@ from .serializers import (
 # ═══════════════════════════════════════════════════════════════
 
 class StudentListCreateView(generics.ListCreateAPIView):
-    """
-    GET  /api/v1/students/?group_id=1&course_id=2
-    POST /api/v1/students/
-    """
     permission_classes = [IsAuthenticated]
+    queryset = Student.objects.all()
 
     def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return Student.objects.none()
+
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return Student.objects.none()
+
         qs = Student.objects.filter(
-            group__course__teacher=self.request.user
+            group__course__teacher=user
         ).select_related('group', 'group__course').prefetch_related('score')
 
-        group_id  = self.request.query_params.get('group_id')
+        group_id = self.request.query_params.get('group_id')
         course_id = self.request.query_params.get('course_id')
         if group_id:
             qs = qs.filter(group_id=group_id)
@@ -87,14 +91,20 @@ class StudentListCreateView(generics.ListCreateAPIView):
 
 
 class StudentDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """GET / PUT / DELETE /api/v1/students/<id>/"""
     permission_classes = [IsAuthenticated]
+    queryset = Student.objects.all()
 
     def get_queryset(self):
-        return Student.objects.filter(
-            group__course__teacher=self.request.user
-        ).select_related('group', 'group__course').prefetch_related('score')
+        if getattr(self, 'swagger_fake_view', False):
+            return Student.objects.none()
 
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return Student.objects.none()
+
+        return Student.objects.filter(
+            group__course__teacher=user
+        ).select_related('group', 'group__course').prefetch_related('score')
     def get_serializer_class(self):
         if self.request.method in ['PUT', 'PATCH']:
             return StudentCreateSerializer
