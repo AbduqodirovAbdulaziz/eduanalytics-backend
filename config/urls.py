@@ -8,6 +8,7 @@ from django.contrib import admin
 from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.generic import RedirectView
 
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
@@ -67,6 +68,9 @@ Bu API Flutter frontend ilovasi bilan ishlash uchun mo'ljallangan.
 #  🌐 URL PATTERNS
 # ══════════════════════════════════════════════════════════════
 urlpatterns = [
+    # ── Root → Swagger ga redirect ────────────────────────
+    path('', RedirectView.as_view(url='/api/v1/swagger/', permanent=False)),
+
     # ── Admin panel (Jazzmin) ──────────────────────────────
     path('admin/', admin.site.urls),
 
@@ -74,11 +78,11 @@ urlpatterns = [
     path('api/v1/', include([
 
         # Authentication
-        path('auth/',    include('apps.authentication.urls')),
+        path('auth/',     include('apps.authentication.urls')),
 
         # CRUD
-        path('courses/', include('apps.courses.urls')),
-        path('groups/',  include('apps.groups.urls')),
+        path('courses/',  include('apps.courses.urls')),
+        path('groups/',   include('apps.groups.urls')),
         path('students/', include('apps.students.urls')),
 
         # ── Kunlik kiritish (Bulk endpoints) ──────────────
